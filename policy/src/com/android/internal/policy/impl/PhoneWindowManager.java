@@ -356,6 +356,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // Behavior of volume wake
     boolean mVolumeWakeScreen;
 
+    // Behavior of trackball wake
+    boolean mTrackballWakeScreen;
+
     // Behavior of camera wake
     boolean mCameraWakeScreen;
     boolean mCameraSleepOnRelease;
@@ -617,6 +620,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.CAMERA_SLEEP_ON_RELEASE), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.TRACKBALL_WAKE_SCREEN), false, this,
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.VOLBTN_MUSIC_CONTROLS), false, this,
@@ -1475,6 +1481,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     Settings.System.HOME_WAKE_SCREEN, 1, UserHandle.USER_CURRENT) == 1);
             mVolumeWakeScreen = (Settings.System.getIntForUser(resolver,
                     Settings.System.VOLUME_WAKE_SCREEN, 0, UserHandle.USER_CURRENT) == 1);
+            mTrackballWakeScreen = (Settings.System.getIntForUser(resolver,
+                    Settings.System.TRACKBALL_WAKE_SCREEN, 1, UserHandle.USER_CURRENT) == 1);
             mCameraWakeScreen = (Settings.System.getIntForUser(resolver,
                     Settings.System.CAMERA_WAKE_SCREEN, 0, UserHandle.USER_CURRENT) == 1);
             mCameraSleepOnRelease = ((Settings.System.getIntForUser(resolver,
@@ -4760,8 +4768,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     public int interceptMotionBeforeQueueingWhenScreenOff(int policyFlags) {
         int result = 0;
 
-        final boolean isWakeMotion = (policyFlags
-                & (WindowManagerPolicy.FLAG_WAKE | WindowManagerPolicy.FLAG_WAKE_DROPPED)) != 0;
+        final int policyflag = (policyFlags
+                & (WindowManagerPolicy.FLAG_WAKE | WindowManagerPolicy.FLAG_WAKE_DROPPED));
+        final boolean isWakeMotion = ((policyflag != 0) && (policyflag != 3))
+        // mouse events will produce a 1 (WAKE) or 2 (WAKE_DROPPED) but never 3,
+        // so we can assign 3 as a special value for the trackball motion events
+        // in InputReader.cpp so we can AND it with a toggle setting
+        // This is really wrong but seems to work without effecting external
+        // devices ability to wake the device.
+            || ((policyflag == 3) && mTrackballWakeScreen);
         if (isWakeMotion) {
             result |= ACTION_WAKE_UP;
         }
